@@ -1,0 +1,17 @@
+{
+  "name": "nge-deploy",
+  "version": "1.0.0",
+  "description": "A command-line application to scaffold out a full stack AngularJS application using Express",
+  "main": "nge-deploy.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Lee Kubicek",
+  "license": "ISC",
+  "dependencies": {
+    "cross-spawn": "^5.1.0",
+    "ncp": "^2.0.0",
+    "prompt": "^1.0.0",
+    "rimraf": "^2.6.1"
+  }
+}
