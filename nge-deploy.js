@@ -12,11 +12,15 @@ prompt.start();
 prompt.get(config.schema, installGlobalDependencies);
 
 function installGlobalDependencies (err, result){
-    console.log('Installing global dependencies...');
-    let globalDep = spawn('npm', ['i', '-g', 'express-generator', '@angular/cli'], {stdio: 'inherit'});
-    appParams = result;
-    // buildDir += appParams.name;
-    globalDep.on('close', makeBuildDir);
+    if (err){
+        console.log('There was a problem with your input: ' + err);
+    } else {
+        console.log('Installing global dependencies...');
+        let globalDep = spawn('npm', ['i', '-g', 'express-generator', '@angular/cli'], {stdio: 'inherit'});
+        appParams = result;
+        // buildDir += appParams.name;
+        globalDep.on('close', makeBuildDir);
+    }
 }
 
 function makeBuildDir(code){
@@ -66,7 +70,7 @@ function moveNgProj(code){
         console.log('Angular project creation failed.  Terminating process.')
         //TODO: roll back project
     } else {
-        console.log('Moving Angular Project to build directory...')
+        console.log('Moving Angular Project to build directory...');
         ncp(appParams.name, buildDir + '/' + appParams.name, addDevDependencies);
     }
 
@@ -141,7 +145,7 @@ function cleanUp(err){
     if (err) {
         console.log(err);
     } else {
-        console.log('Project Generation Complete!')
+        console.log('Project Generation Complete!');
         if (appParams.fullstack.toLowerCase() === 'y') {
             rimraf(buildDir + '/' + appParams.name + '-server', [null], (err) => {
                 if (err) {
