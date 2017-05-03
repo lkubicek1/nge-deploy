@@ -21,6 +21,12 @@ let schema = {
             default: 'y',
             pattern: /^y$|^n$|^Y$|^N$/,
             message: 'y|n'
+        },
+        globDep: {
+            description: 'Install global dependencies',
+            default: 'y',
+            pattern: /^y$|^n$|^Y$|^N$/,
+            message: 'y|n'
         }
     }
 };
@@ -37,8 +43,15 @@ app.use((req, res, next) => {
 
 `;
 
+let errHndlr = `app.use(function(req, res, next) {
+  res.render('index');
+});
+
+module.exports = app;`;
+
 module.exports = {
     schema,
     ngDevDependencies,
-    CORS
+    CORS,
+    errHndlr
 };

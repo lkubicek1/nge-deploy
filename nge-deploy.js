@@ -15,11 +15,16 @@ function installGlobalDependencies (err, result){
     if (err){
         console.log('There was a problem with your input: ' + err);
     } else {
-        console.log('Installing global dependencies...');
-        let globalDep = spawn('npm', ['i', '-g', 'express-generator', '@angular/cli'], {stdio: 'inherit'});
         appParams = result;
-        // buildDir += appParams.name;
-        globalDep.on('close', makeBuildDir);
+        if (appParams.globDep.toLowerCase() === 'y') {
+            console.log('Installing global dependencies...');
+            let globalDep = spawn('npm', ['i', '-g', 'express-generator', '@angular/cli'], {stdio: 'inherit'});
+
+            // buildDir += appParams.name;
+            globalDep.on('close', makeBuildDir);
+        } else {
+            makeBuildDir();
+        }
     }
 }
 
@@ -39,7 +44,7 @@ function buildServer (code){
         //TODO: roll back project
     } else {
         let viewArg = '--view=' + appParams.viewEngine;
-        console.log('installing express applicaiton....');
+        console.log('installing express application....');
         let expressGen = spawn('express', [viewArg, appParams.name], {cwd: buildDir, stdio: 'inherit'});
         expressGen.on('close', prepServer);
     }
@@ -53,13 +58,31 @@ function prepServer(code){
         fs.renameSync(buildDir + '/' + appParams.name, buildDir + '/' + appParams.name + '-server');
         fs.renameSync(buildDir + '/' + appParams.name + '-server/app.js', buildDir + '/' + appParams.name + '-server/app.js.orig');
         let foundRoute = false;
+        let foundErrHndlr = false;
         fs.readFileSync(buildDir + '/' + appParams.name + '-server/app.js.orig').toString().split('\n').forEach((line) => {
             if (line.includes(`app.use('/',`) && !foundRoute) {
                 foundRoute = true;
                 fs.appendFileSync(buildDir + '/' + appParams.name + '-server/app.js', config.CORS);
+                fs.appendFileSync(buildDir + '/' + appParams.name + '-server/app.js', `app.use('/', appRoutes);` + "\n");
+            } else if (line.includes(`app.set('views'`)){
+                fs.appendFileSync(buildDir + '/' + appParams.name + '-server/app.js', '//' + line.toString() + "\n");
+            } else if (line.includes(`app.set('view engine'`)){
+                fs.appendFileSync(buildDir + '/' + appParams.name + '-server/app.js', '//' + line.toString() + "\n");
+            } else if (line.includes(`var users = require('./routes/users');`)){
+                fs.appendFileSync(buildDir + '/' + appParams.name + '-server/app.js', '//' + line.toString() + "\n");
+            } else if (line.includes(`app.use('/users', users);`)){
+                fs.appendFileSync(buildDir + '/' + appParams.name + '-server/app.js', '//' + line.toString() + "\n");
+            } else if (line.includes(`var index = require('./routes/index');`)) {
+                fs.appendFileSync(buildDir + '/' + appParams.name + '-server/app.js', `var appRoutes = require('./routes/app');` + "\n");
+            } else if (line.includes(`app.use(function(req, res, next)`) && !foundErrHndlr){
+                foundErrHndlr = true;
+                fs.appendFileSync(buildDir + '/' + appParams.name + '-server/app.js', config.errHndlr);
+            } else if (!foundErrHndlr) {
+                fs.appendFileSync(buildDir + '/' + appParams.name + '-server/app.js', line.toString() + "\n");
             }
-            fs.appendFileSync(buildDir + '/' + appParams.name + '-server/app.js', line.toString() + "\n");
         });
+        fs.renameSync(buildDir + '/' + appParams.name + '-server/routes/index.js', buildDir + '/' + appParams.name + '-server/routes/app.js');
+
         let ngNew = spawn('ng', ['new', appParams.name], {stdio: 'inherit'});
         ngNew.on('close', moveNgProj);
     }
@@ -119,16 +142,21 @@ function mergeProjects (code){
         if (appParams.fullstack.toLowerCase() === 'y') {
             let serverPackage = JSON.parse(fs.readFileSync(buildDir + '/' + appParams.name + '-server/package.json', 'utf8'));
             let ngPackage = JSON.parse(fs.readFileSync(buildDir + '/' + appParams.name + '/package.json', 'utf8'));
+            let ngCliConfig = JSON.parse(fs.readFileSync(buildDir + '/' + appParams.name + '/.angular-cli.json', 'utf8'));
             fs.unlinkSync(buildDir + '/' + appParams.name + '/package.json');
             fs.unlinkSync(buildDir + '/' + appParams.name + '-server/package.json');
+            fs.unlinkSync(buildDir + '/' + appParams.name + '/.angular-cli.json');
 
             Object.assign(ngPackage['scripts'], serverPackage['scripts']);
             Object.assign(ngPackage['dependencies'], serverPackage['dependencies']);
             Object.assign(ngPackage['devDependencies'], serverPackage['devDependencies']);
 
-            fs.writeFile(buildDir + '/' + appParams.name + '/package.json', JSON.stringify(ngPackage, null, '\t'), copyDir);
+            ngCliConfig.apps[0].outDir = "public";
+            fs.writeFileSync(buildDir + '/' + appParams.name + '/package.json', JSON.stringify(ngPackage, null, '\t'));
+            fs.writeFile(buildDir + '/' + appParams.name + '/.angular-cli.json', JSON.stringify(ngCliConfig, null, '\t'), copyDir);
         } else {
-            console.log('Project Generation Complete!');
+            let npmInstall = spawn('npm', ['i'], {cwd: buildDir + '/' + appParams.name + '-server', stdio: 'inherit'});
+            npmInstall.on('close', console.log('Project Generation Complete!'));
         }
     }
 }
@@ -145,18 +173,16 @@ function cleanUp(err){
     if (err) {
         console.log(err);
     } else {
-        console.log('Project Generation Complete!');
-        if (appParams.fullstack.toLowerCase() === 'y') {
-            rimraf(buildDir + '/' + appParams.name + '-server', [null], (err) => {
-                if (err) {
-                    console.log('Unable to delete stand-alone server directory: ' + err)
-                } else {
-                    console.log('Stand-alone server directory removed!')
-                }
-            });
-        }
+        let npmInstallNg = spawn('npm', ['i'], {cwd: buildDir + '/' + appParams.name, stdio: 'inherit'});
+        rimraf(buildDir + '/' + appParams.name + '-server', [null], (err) => {
+            if (err) {
+                console.log('Unable to delete stand-alone server directory: ' + err)
+            } else {
+                console.log('Stand-alone server directory removed!')
+            }
+        });
+        npmInstallNg.on('close', console.log('Project Generation Complete!'));
     }
 }
-//TODO: add production build procedure for server-side deployment (combine all required files into one directory)
 //TODO: add option to remove global dependencies (ie clean install)
 
