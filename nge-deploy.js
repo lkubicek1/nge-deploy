@@ -181,7 +181,7 @@ function cleanUp(err){
                 console.log('Stand-alone server directory removed!')
             }
         });
-        npmInstallNg.on('close', console.log('Project Generation Complete!'));
+        //npmInstallNg.on('close', console.log('Project Generation Complete!'));
     }
 }
 //TODO: add option to remove global dependencies (ie clean install)
